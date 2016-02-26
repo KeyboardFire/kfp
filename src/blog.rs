@@ -27,12 +27,12 @@ pub fn gen_blog() -> Result<(), io::Error> {
 
     // slurp the entire template file into memory
     // yum
-    let mut template_file = try!(File::open("data/blog/TEMPLATE.html"));
+    let mut template_file = try!(File::open("../_data/blog/TEMPLATE.html"));
     let mut template = String::new();
     try!(template_file.read_to_string(&mut template));
 
     // let's generate /blog/somecategory/somepost.html first
-    let files = try!(fs::read_dir("data/blog"));
+    let files = try!(fs::read_dir("../_data/blog"));
     for file in files {
         let path = file.unwrap().path();
         if !path.ends_with("TEMPLATE.html") {

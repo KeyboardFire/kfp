@@ -4,11 +4,11 @@ use std::io::{self, Read, BufRead, BufReader, Write, BufWriter};
 pub fn gen_home() -> Result<(), io::Error> {
     // slurp the entire template file into memory
     // yum
-    let mut template_file = try!(File::open("data/home/TEMPLATE.html"));
+    let mut template_file = try!(File::open("../_data/home/TEMPLATE.html"));
     let mut template = String::new();
     try!(template_file.read_to_string(&mut template));
 
-    let files = try!(fs::read_dir("data/home"));
+    let files = try!(fs::read_dir("../_data/home"));
     for file in files {
         let path = file.unwrap().path();
         if !path.ends_with("TEMPLATE.html") {
