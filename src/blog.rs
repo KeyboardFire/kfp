@@ -27,12 +27,12 @@ pub fn gen_blog() -> Result<(), io::Error> {
 
     // slurp the entire template file into memory
     // yum
-    let mut template_file = try!(File::open("../_data/blog/TEMPLATE.html"));
+    let mut template_file = try!(File::open("_data/blog/TEMPLATE.html"));
     let mut template = String::new();
     try!(template_file.read_to_string(&mut template));
 
     // let's generate /blog/somecategory/somepost.html first
-    let files = try!(fs::read_dir("../_data/blog"));
+    let files = try!(fs::read_dir("_data/blog"));
     for file in files {
         let path = file.unwrap().path();
         if !path.ends_with("TEMPLATE.html") {
@@ -62,7 +62,7 @@ pub fn gen_blog() -> Result<(), io::Error> {
 
             let fname = path.file_name().unwrap().to_str().unwrap();
             let mut bw = BufWriter::new(try!(File::create(format!(
-                "../blog/{}/{}.html", category, &fname[..fname.len()-3]))));
+                "blog/{}/{}.html", category, &fname[..fname.len()-3]))));
 
             let summary_doc = Markdown::new(summary);
             let mut summary_html = Html::new(html::Flags::empty(), 0);
@@ -114,7 +114,7 @@ pub fn gen_blog() -> Result<(), io::Error> {
     // now let's generate /blog/somecategory/index.html next
     for category in categories.iter() {
         let mut bw = BufWriter::new(try!(File::create(format!(
-            "../blog/{}/index.html", category))));
+            "blog/{}/index.html", category))));
 
         for template_line in template.lines() {
             if template_line.ends_with("<!--<>-->") {
@@ -135,10 +135,10 @@ pub fn gen_blog() -> Result<(), io::Error> {
     // finally, patch /blog.html
     // there's no better way to do this than by copying down to a temp file and
     //   then replacing the original
-    try!(fs::copy("../blog/index.html", "../_blog.html"));
+    try!(fs::copy("blog/index.html", "_blog.html"));
     let (br, mut bw) = (
-        BufReader::new(try!(File::open("../_blog.html"))),
-        BufWriter::new(try!(File::create("../blog/index.html"))));
+        BufReader::new(try!(File::open("_blog.html"))),
+        BufWriter::new(try!(File::create("blog/index.html"))));
     for br_line in br.lines() {
         let line = br_line.unwrap();
         if line.ends_with("<!--<C>-->") {
@@ -161,7 +161,7 @@ pub fn gen_blog() -> Result<(), io::Error> {
             try!(writeln!(bw, "{}", line));
         }
     }
-    try!(fs::remove_file("../_blog.html"));
+    try!(fs::remove_file("_blog.html"));
 
     Ok(())
 }

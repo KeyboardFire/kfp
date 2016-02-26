@@ -4,19 +4,19 @@ use std::io::{self, Read, BufRead, BufReader, Write, BufWriter};
 pub fn gen_home() -> Result<(), io::Error> {
     // slurp the entire template file into memory
     // yum
-    let mut template_file = try!(File::open("../_data/home/TEMPLATE.html"));
+    let mut template_file = try!(File::open("_data/home/TEMPLATE.html"));
     let mut template = String::new();
     try!(template_file.read_to_string(&mut template));
 
-    let files = try!(fs::read_dir("../_data/home"));
+    let files = try!(fs::read_dir("_data/home"));
     for file in files {
         let path = file.unwrap().path();
         if !path.ends_with("TEMPLATE.html") {
             let br = BufReader::new(try!(File::open(path.clone())));
             let fname = path.file_name().unwrap().to_str().unwrap();
             let mut bw = BufWriter::new(try!(File::create(
-                if fname == "index.html" { "../index.html".to_string() }
-                else { format!("../{}/index.html", &fname[..fname.len()-5]) }
+                if fname == "index.html" { "index.html".to_string() }
+                else { format!("{}/index.html", &fname[..fname.len()-5]) }
             )));
 
             let mut template_lines = template.lines();
