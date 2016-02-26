@@ -64,11 +64,14 @@ pub fn gen_blog() -> Result<(), io::Error> {
             let mut bw = BufWriter::new(try!(File::create(format!(
                 "../blog/{}/{}.html", category, &fname[..fname.len()-3]))));
 
+            let summary_doc = Markdown::new(summary);
+            let mut summary_html = Html::new(html::Flags::empty(), 0);
             posts.push(Post {
                 title: title.to_string(),
                 date: NaiveDate::parse_from_str(date, "%Y-%m-%d")
                     .expect("metadata date parse error"),
-                summary: summary.to_string(),
+                summary: summary_html.render(&summary_doc).to_str().unwrap()
+                    .to_string(),
                 slug: (&fname[..fname.len()-3]).to_string(),
                 category: category.to_string()
             });
@@ -171,7 +174,7 @@ fn post_html(post: &Post, indent: &String) -> String {
     \n{0}       [<a href='/blog/{1}'>{1}</a>]
     \n{0}       <div class='subheader'>{4}</div>\
     \n{0}   </h3>\
-    \n{0}   <p>{5}</p>\
+    \n{0}   {5}\
     \n{0}</section>",
     indent, post.category, post.slug, post.title, post.date, post.summary)
 }
