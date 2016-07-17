@@ -15,13 +15,13 @@ struct Post {
     date: NaiveDate,
     summary: String,
     slug: String,
-    category: String
+    tags: Vec<String>
 }
 
 pub fn gen_blog() -> Result<(), io::Error> {
-    // we need to keep a thing of all the posts in each category, in
-    //   chronological order, so that we can generate a.) /blog.html and b.)
-    //   /blog/somecategory/index.html
+    // we need to keep a thing of all the posts with each tag, in chronological
+    //   order, so that we can generate a.) /blog.html and
+    //   b.) /blog/sometag/index.html
     // this is that thing
     let mut posts = Vec::<Post>::new();
 
@@ -31,7 +31,7 @@ pub fn gen_blog() -> Result<(), io::Error> {
     let mut template = String::new();
     try!(template_file.read_to_string(&mut template));
 
-    // let's generate /blog/somecategory/somepost.html first
+    // let's generate /blog/somepost/index.html first
     let files = try!(fs::read_dir("_data/blog"));
     for file in files {
         let path = file.unwrap().path();
@@ -54,15 +54,18 @@ pub fn gen_blog() -> Result<(), io::Error> {
                     metadata.insert(&line[..colon], &line[colon+2..]);
                 }
             }
-            let (title, date, category, summary) = (
+            let (title, date, tags, summary) = (
                 *metadata.get("title").expect("metadata missing title"),
                 *metadata.get("date").expect("metadata missing date"),
-                *metadata.get("category").unwrap_or(&"uncategorized"),
+                (*metadata.get("tags").unwrap_or(&"untagged")).split(' ')
+                    .map(String::from).collect::<Vec<String>>(),
                 *metadata.get("summary").expect("metadata missing summary"));
 
             let fname = path.file_name().unwrap().to_str().unwrap();
+            let postname = &fname[..fname.len()-3];
+            let _ = fs::create_dir(format!("blog/{}", postname));
             let mut bw = BufWriter::new(try!(File::create(format!(
-                "blog/{}/{}.html", category, &fname[..fname.len()-3]))));
+                "blog/{}/index.html", postname))));
 
             let summary_doc = Markdown::new(summary);
             let mut summary_html = Html::new(html::Flags::empty(), 0);
@@ -73,7 +76,7 @@ pub fn gen_blog() -> Result<(), io::Error> {
                 summary: summary_html.render(&summary_doc).to_str().unwrap()
                     .to_string(),
                 slug: (&fname[..fname.len()-3]).to_string(),
-                category: category.to_string()
+                tags: tags.clone()
             });
 
             for template_line in template.lines() {
@@ -83,9 +86,8 @@ pub fn gen_blog() -> Result<(), io::Error> {
                     let indent: String = (0..template_line.find(|c| c != ' ')
                         .unwrap()).map(|_| ' ').collect();
                     try!(writeln!(bw, "{}<h2>{}<div class='subheader'>posted \
-                                       on {} in category <a href='/blog/{}'>\
-                                       {3}</a></div></h2>",
-                            indent, title, date, category));
+                                       on {} with tags {}</div></h2>",
+                            indent, title, date, tags_html(&tags)));
                     let doc = Markdown::new(&md[..]);
                     let mut html = Html::new(html::Flags::empty(), 0);
                     for line in html.render(&doc).to_str().unwrap().lines() {
@@ -101,29 +103,29 @@ pub fn gen_blog() -> Result<(), io::Error> {
     // sort the list of posts by date real quick
     posts.sort_by(|a, b| b.date.cmp(&a.date));
 
-    // also get a list of categories sorted by frequency
-    let mut full_categories: Vec<String> = posts.iter()
-        .map(|p| p.category.clone()).collect();
-    full_categories.sort();
-    let mut categories = full_categories.clone();
-    categories.dedup();
-    categories.sort_by(|a, b|
-        full_categories.iter().filter(|&x| x == b).count().cmp(
-            &full_categories.iter().filter(|&x| x == a).count()));
+    // also get a list of tags sorted by frequency
+    let mut full_tags: Vec<String> = posts.iter()
+        .flat_map(|p| p.tags.clone()).collect();
+    full_tags.sort();
+    let mut tags = full_tags.clone();
+    tags.dedup();
+    tags.sort_by(|a, b|
+        full_tags.iter().filter(|&x| x == b).count().cmp(
+            &full_tags.iter().filter(|&x| x == a).count()));
 
-    // now let's generate /blog/somecategory/index.html next
-    for category in categories.iter() {
+    // now let's generate /blog/sometag/index.html next
+    for tag in tags.iter() {
+        let _ = fs::create_dir(format!("blog/{}", tag));
         let mut bw = BufWriter::new(try!(File::create(format!(
-            "blog/{}/index.html", category))));
+            "blog/{}/index.html", tag))));
 
         for template_line in template.lines() {
             if template_line.ends_with("<!--<>-->") {
                 let indent: String = (0..template_line.find(|c| c != ' ')
                     .unwrap()).map(|_| ' ').collect();
 
-                try!(writeln!(bw, "{}<h2>Posts in category [{}]</h2>",
-                        indent, category));
-                for post in posts.iter().filter(|p| p.category == *category) {
+                try!(writeln!(bw, "{}<h2>Posts tagged [{}]</h2>", indent, tag));
+                for post in posts.iter().filter(|p| p.tags.contains(tag)) {
                     try!(writeln!(bw, "{}", post_html(post, &indent)));
                 }
             } else {
@@ -145,11 +147,11 @@ pub fn gen_blog() -> Result<(), io::Error> {
             let indent: String = (0..line.find(|c| c != ' ').unwrap())
                 .map(|_| ' ').collect();
 
-            // write categories
-            try!(writeln!(bw, "{}<p>Categories:", indent));
-            for category in categories.iter() {
+            // write tags
+            try!(writeln!(bw, "{}<p>Tags:", indent));
+            for tag in tags.iter() {
                 try!(writeln!(bw, "{}    [<a href='/blog/{}'>{1}</a>]",
-                    indent, category));
+                    indent, tag));
             }
             try!(writeln!(bw, "{}</p>", indent));
 
@@ -170,11 +172,16 @@ fn post_html(post: &Post, indent: &String) -> String {
     format!(
      "{0}<section class='post'>\
     \n{0}   <h3>\
-    \n{0}       <a href='/blog/{1}/{2}.html'>{3}</a>\
-    \n{0}       [<a href='/blog/{1}'>{1}</a>]
+    \n{0}       <a href='/blog/{2}'>{3}</a>\
+    \n{0}       {1}\
     \n{0}       <div class='subheader'>{4}</div>\
     \n{0}   </h3>\
     \n{0}   {5}\
     \n{0}</section>",
-    indent, post.category, post.slug, post.title, post.date, post.summary)
+    indent, tags_html(&post.tags), post.slug, post.title, post.date, post.summary)
+}
+
+fn tags_html(tags: &Vec<String>) -> String {
+    tags.iter().map(|tag| format!("[<a href='/blog/{0}'>{0}</a>]", tag))
+        .collect::<Vec<String>>().join(" ")
 }
