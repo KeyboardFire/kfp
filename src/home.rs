@@ -4,20 +4,20 @@ use std::io::{self, Read, BufRead, BufReader, Write, BufWriter};
 pub fn gen_home() -> Result<(), io::Error> {
     // slurp the entire template file into memory
     // yum
-    let mut template_file = try!(File::open("_data/home/TEMPLATE.html"));
+    let mut template_file = File::open("_data/home/TEMPLATE.html")?;
     let mut template = String::new();
-    try!(template_file.read_to_string(&mut template));
+    template_file.read_to_string(&mut template)?;
 
-    let files = try!(fs::read_dir("_data/home"));
+    let files = fs::read_dir("_data/home")?;
     for file in files {
         let path = file.unwrap().path();
         if !path.ends_with("TEMPLATE.html") {
-            let br = BufReader::new(try!(File::open(path.clone())));
+            let br = BufReader::new(File::open(path.clone())?);
             let fname = path.file_name().unwrap().to_str().unwrap();
-            let mut bw = BufWriter::new(try!(File::create(
-                if fname == "index.html" { "index.html".to_string() }
-                else { format!("{}/index.html", &fname[..fname.len()-5]) }
-            )));
+            let mut bw = BufWriter::new(File::create(
+                    if fname == "index.html" { "index.html".to_string() }
+                    else { format!("{}/index.html", &fname[..fname.len()-5]) }
+                    )?);
 
             let mut template_lines = template.lines();
             let mut indent_level = 0;
@@ -31,13 +31,13 @@ pub fn gen_home() -> Result<(), io::Error> {
                             let target_path = &template_line[
                                 template_line[..idx-1].to_string().rfind('/')
                                     .unwrap()+1..idx-2];
-                            try!(writeln!(bw, "{}{}>{}", &template_line[..idx-1],
-                                    if &fname[..fname.len()-5] == target_path
-                                        { " id='active'" } else { "" },
-                                    &template_line[idx+10..]));
+                            writeln!(bw, "{}{}>{}", &template_line[..idx-1],
+                                     if &fname[..fname.len()-5] == target_path
+                                     { " id='active'" } else { "" },
+                                     &template_line[idx+10..])?;
                         },
                         None => {
-                            try!(writeln!(bw, "{}", template_line));
+                            writeln!(bw, "{}", template_line)?;
                         }
                     }
                 }
@@ -45,11 +45,11 @@ pub fn gen_home() -> Result<(), io::Error> {
             for line in br.lines() {
                 // this range-map-collect thing probably isn't too idiomatic
                 // but who cares
-                try!(writeln!(bw, "{}{}", (0..indent_level).map(|_| ' ')
-                        .collect::<String>(), line.unwrap()));
+                writeln!(bw, "{}{}", (0..indent_level).map(|_| ' ')
+                         .collect::<String>(), line.unwrap())?;
             }
             for template_line in template_lines {
-                try!(writeln!(bw, "{}", template_line));
+                writeln!(bw, "{}", template_line)?;
             }
         }
     }
