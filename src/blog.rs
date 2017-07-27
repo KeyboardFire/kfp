@@ -31,6 +31,17 @@ pub fn gen_blog() -> Result<(), io::Error> {
     let mut template = String::new();
     template_file.read_to_string(&mut template)?;
 
+    // build the RSS feed while we're at it
+    let mut rss_file = File::create("blog.xml")?;
+    writeln!(rss_file,
+             "<?xml version='1.0' encoding='utf-8'?>\
+            \n<rss version='2.0'>\
+            \n  <channel>\
+            \n    <title>KeyboardFire—blog</title>\
+            \n    <link>http://keyboardfire.com/blog/</link>\
+            \n    <description>ramblings on various topics</description>\
+            \n    <language>en</language>")?;
+
     // let's generate /blog/somepost/index.html first
     let files = fs::read_dir("_data/blog")?;
     for file in files {
@@ -158,12 +169,18 @@ pub fn gen_blog() -> Result<(), io::Error> {
             // write posts
             for post in &posts {
                 writeln!(bw, "{}", post_html(post, &indent))?;
+                writeln!(rss_file, "{}", post_rss(post))?;
             }
         } else {
             writeln!(bw, "{}", line)?;
         }
     }
     fs::remove_file("_blog.html")?;
+
+    // close RSS tags
+    writeln!(rss_file,
+             "  </channel>\
+            \n</rss>")?;
 
     Ok(())
 }
@@ -181,7 +198,27 @@ fn post_html(post: &Post, indent: &String) -> String {
     indent, tags_html(&post.tags), post.slug, post.title, post.date, post.summary)
 }
 
+fn post_rss(post: &Post) -> String {
+    format!(
+     "    <item>\
+    \n      <title>{}</title>\
+    \n      <link>http://keyboardfire.com/blog/{}</link>\
+    \n      <description>{}</description>\
+    \n      <pubDate>{}</pubDate>\
+    \n      <guid>http://keyboardfire.com/blog/{1}</guid>\
+    \n    </item>", post.title, post.slug, unhtml(&post.summary), post.date.format("%a, %d %b %Y 17:00:00 GMT"))
+}
+
 fn tags_html(tags: &Vec<String>) -> String {
     tags.iter().map(|tag| format!("[<a href='/blog/{0}'>{0}</a>]", tag))
         .collect::<Vec<String>>().join(" ")
+}
+
+fn unhtml(s: &String) -> String {
+    let mut s = s.clone();
+    while let Some(openpos) = s.find('<') {
+        let closepos = s.find('>').unwrap();
+        s.drain(openpos..closepos+1);
+    }
+    s.trim_right().to_string()
 }
