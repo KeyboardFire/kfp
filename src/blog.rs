@@ -27,18 +27,18 @@ pub fn gen_blog() -> Result<(), io::Error> {
 
     // slurp the entire template file into memory
     // yum
-    let mut template_file = try!(File::open("_data/blog/TEMPLATE.html"));
+    let mut template_file = File::open("_data/blog/TEMPLATE.html")?;
     let mut template = String::new();
-    try!(template_file.read_to_string(&mut template));
+    template_file.read_to_string(&mut template)?;
 
     // let's generate /blog/somepost/index.html first
-    let files = try!(fs::read_dir("_data/blog"));
+    let files = fs::read_dir("_data/blog")?;
     for file in files {
         let path = file.unwrap().path();
         if !path.ends_with("TEMPLATE.html") {
-            let mut md_file = try!(File::open(path.clone()));
+            let mut md_file = File::open(path.clone())?;
             let mut md = String::new();
-            try!(md_file.read_to_string(&mut md));
+            md_file.read_to_string(&mut md)?;
 
             let mut metadata = HashMap::new();
             let mut looking_for_summary = false;
@@ -64,8 +64,8 @@ pub fn gen_blog() -> Result<(), io::Error> {
             let fname = path.file_name().unwrap().to_str().unwrap();
             let postname = &fname[..fname.len()-3];
             let _ = fs::create_dir(format!("blog/{}", postname));
-            let mut bw = BufWriter::new(try!(File::create(format!(
-                "blog/{}/index.html", postname))));
+            let mut bw = BufWriter::new(File::create(format!(
+                        "blog/{}/index.html", postname))?);
 
             let summary_doc = Markdown::new(summary);
             let mut summary_html = Html::new(html::Flags::empty(), 0);
@@ -85,16 +85,16 @@ pub fn gen_blog() -> Result<(), io::Error> {
                     // idiomatic, but who cares
                     let indent: String = (0..template_line.find(|c| c != ' ')
                         .unwrap()).map(|_| ' ').collect();
-                    try!(writeln!(bw, "{}<h2>{}<div class='subheader'>posted \
+                    writeln!(bw, "{}<h2>{}<div class='subheader'>posted \
                                        on {} with tags {}</div></h2>",
-                            indent, title, date, tags_html(&tags)));
+                                       indent, title, date, tags_html(&tags))?;
                     let doc = Markdown::new(&md[..]);
                     let mut html = Html::new(html::Flags::empty(), 0);
                     for line in html.render(&doc).to_str().unwrap().lines() {
-                        try!(writeln!(bw, "{}{}", indent, line));
+                        writeln!(bw, "{}{}", indent, line)?;
                     }
                 } else {
-                    try!(writeln!(bw, "{}", template_line));
+                    writeln!(bw, "{}", template_line)?;
                 }
             }
         }
@@ -114,22 +114,22 @@ pub fn gen_blog() -> Result<(), io::Error> {
             &full_tags.iter().filter(|&x| x == a).count()));
 
     // now let's generate /blog/sometag/index.html next
-    for tag in tags.iter() {
+    for tag in &tags {
         let _ = fs::create_dir(format!("blog/{}", tag));
-        let mut bw = BufWriter::new(try!(File::create(format!(
-            "blog/{}/index.html", tag))));
+        let mut bw = BufWriter::new(File::create(format!(
+                    "blog/{}/index.html", tag))?);
 
         for template_line in template.lines() {
             if template_line.ends_with("<!--<>-->") {
                 let indent: String = (0..template_line.find(|c| c != ' ')
                     .unwrap()).map(|_| ' ').collect();
 
-                try!(writeln!(bw, "{}<h2>Posts tagged [{}]</h2>", indent, tag));
+                writeln!(bw, "{}<h2>Posts tagged [{}]</h2>", indent, tag)?;
                 for post in posts.iter().filter(|p| p.tags.contains(tag)) {
-                    try!(writeln!(bw, "{}", post_html(post, &indent)));
+                    writeln!(bw, "{}", post_html(post, &indent))?;
                 }
             } else {
-                try!(writeln!(bw, "{}", template_line));
+                writeln!(bw, "{}", template_line)?;
             }
         }
     }
@@ -137,10 +137,10 @@ pub fn gen_blog() -> Result<(), io::Error> {
     // finally, patch /blog.html
     // there's no better way to do this than by copying down to a temp file and
     //   then replacing the original
-    try!(fs::copy("blog/index.html", "_blog.html"));
+    fs::copy("blog/index.html", "_blog.html")?;
     let (br, mut bw) = (
-        BufReader::new(try!(File::open("_blog.html"))),
-        BufWriter::new(try!(File::create("blog/index.html"))));
+        BufReader::new(File::open("_blog.html")?),
+        BufWriter::new(File::create("blog/index.html")?));
     for br_line in br.lines() {
         let line = br_line.unwrap();
         if line.ends_with("<!--<C>-->") {
@@ -148,22 +148,22 @@ pub fn gen_blog() -> Result<(), io::Error> {
                 .map(|_| ' ').collect();
 
             // write tags
-            try!(writeln!(bw, "{}<p>Tags:", indent));
-            for tag in tags.iter() {
-                try!(writeln!(bw, "{}    [<a href='/blog/{}'>{1}</a>]",
-                    indent, tag));
+            writeln!(bw, "{}<p>Tags:", indent)?;
+            for tag in &tags {
+                writeln!(bw, "{}    [<a href='/blog/{}'>{1}</a>]",
+                         indent, tag)?;
             }
-            try!(writeln!(bw, "{}</p>", indent));
+            writeln!(bw, "{}</p>", indent)?;
 
             // write posts
-            for post in posts.iter() {
-                try!(writeln!(bw, "{}", post_html(post, &indent)));
+            for post in &posts {
+                writeln!(bw, "{}", post_html(post, &indent))?;
             }
         } else {
-            try!(writeln!(bw, "{}", line));
+            writeln!(bw, "{}", line)?;
         }
     }
-    try!(fs::remove_file("_blog.html"));
+    fs::remove_file("_blog.html")?;
 
     Ok(())
 }
